@@ -236,6 +236,15 @@ match expected scopes`** (only relevant if you're building/pushing the image
 yourself, not just running it) — your GHCR token is missing `write:packages`; see
 the build repo's docs.
 
+**`ERROR: Command: 'git -C /projects_mirror/scratch/... commit ...' failed with
+error 'Author identity unknown'`** during step 5 — cosmetic, not a real failure.
+Image tags built on CIME 6.1.173+ (`sci.1.92.3_api.44.1.0` and later) try to
+auto-commit the case directory for provenance tracking, which fails silently
+because `elm-user` has no git identity configured inside the container. `case.run`
+and `st_archive` complete successfully regardless — check for
+`Aggregated_E3SM_FATES_TEST_Output.nc` (step 6) to confirm the run actually
+succeeded; if it's there, this warning can be ignored.
+
 ## Versioning
 
 See `CHANGELOG.md` for which release of this repo pairs with which image tag, and what
