@@ -1,0 +1,14 @@
+services:
+  personal-elm-fates:
+    image: ghcr.io/jamedina09/personal-elm-fates-image:${IMAGE_TAG:-latest}
+    container_name: personal-elm-fates
+    hostname: docker
+    environment:
+      LOCAL_UID: ${LOCAL_UID:-1000}
+      LOCAL_GID: ${LOCAL_GID:-1000}
+    volumes:
+      - type: bind
+        source: ${PROJECT_DIRECTORY:-./projects}
+        target: /projects_mirror
+    stdin_open: true
+    tty: true
