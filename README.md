@@ -71,6 +71,22 @@ pin to a specific FATES/API version (see `CHANGELOG.md` for what's available).
 
 `.env` is gitignored, so your local path never gets committed.
 
+`podman compose` (step 4) reads `.env` automatically — nothing more to do for that.
+But the plain shell commands later in this README (step 5) reference
+`$PROJECT_DIRECTORY` directly, and your shell does **not** read `.env` on its own.
+Load it into your current terminal session before continuing (you'll need to repeat
+this in any new terminal tab/window you use for these commands):
+
+```bash
+set -a
+source .env
+set +a
+````
+
+If you skip this, `$PROJECT_DIRECTORY` silently expands to nothing and commands like
+`mkdir -p "$PROJECT_DIRECTORY/scripts"` end up trying to write to `/scripts` at your
+filesystem root instead — which fails with a permissions/read-only-filesystem error.
+
 ## 3. Pull the image
 
 ```bash
