@@ -108,10 +108,14 @@ match your host account, so files it creates in `PROJECT_DIRECTORY` are owned by
 not some arbitrary container UID — nothing to configure here, `compose.yaml` already
 passes your `id -u`/`id -g` by default.
 
-Open a shell inside it:
+Open a shell inside it — always pass `--user elm-user`, since `podman exec` bypasses
+the container's entrypoint (which is what remaps to your UID/GID and sets up
+`elm-user`'s environment) and defaults to root otherwise. Running as root breaks
+CIME's machine lookup (`ERROR: No machine docker found`), because the custom
+`docker` machine config only lives under `elm-user`'s home, not root's:
 
 ```bash
-podman exec -it personal-elm-fates /bin/bash
+podman exec -it --user elm-user personal-elm-fates /bin/bash
 ````
 
 Inside the container, `cd projects_mirror` and `ls` — you'll see the same files as in
@@ -126,7 +130,7 @@ run it from there:
 ```bash
 mkdir -p "$PROJECT_DIRECTORY/scripts"
 cp sample_script/e3sm_fates_test.sh "$PROJECT_DIRECTORY/scripts/"
-podman exec -it personal-elm-fates /bin/bash
+podman exec -it --user elm-user personal-elm-fates /bin/bash
 cd projects_mirror/scripts
 chmod +x e3sm_fates_test.sh
 ./e3sm_fates_test.sh
@@ -153,8 +157,9 @@ The sample run is just one simulated year for a quick test — real runs can go 
 
 ## Stopping and cleaning up
 
+If you're inside the container, run `exit` first to leave it, then from the host:
+
 ```bash
-podman exec -it personal-elm-fates /bin/bash -c exit   # if you're inside, exit first
 podman compose down
 ````
 
