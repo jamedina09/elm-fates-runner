@@ -5,6 +5,13 @@ tag it's meant to be used with. The image itself is built from
 [ELM-FATES-PERSONAL-CONTAINER](https://github.com/jamedina09/ELM-FATES-PERSONAL-CONTAINER)
 — see that repo's own `CHANGELOG.md` for the underlying FATES/host-model/CIME versions.
 
+## v1.1.1 — 2026-07-19
+
+- The `Author identity unknown` warning documented in v1.1.0 is fixed as of
+  the current `sci.1.92.3_api.44.1.0`/`latest` image (same version tags,
+  updated image content — `podman pull` to get it). No repo files besides
+  this changelog and the README Troubleshooting wording changed.
+
 ## v1.1.0 — 2026-07-19
 
 - `latest` now points to image tag `sci.1.92.3_api.44.1.0` (was
