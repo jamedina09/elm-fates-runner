@@ -57,11 +57,15 @@ elm-fates-runner
 
 ## 2. Configure
 
-Copy the example env file and edit it:
+Copy the example env file, then fill in `LOCAL_UID`/`LOCAL_GID` with your own
+account's values automatically (don't leave these at the `.env.example` placeholder
+of `1000` unless that actually is your UID/GID — mismatched values mean the
+container owns files as the wrong user, causing permission errors later):
 
 ```bash
 cp .env.example .env
-open .env   # or your preferred text editor
+sed -i.bak "s/^LOCAL_UID=.*/LOCAL_UID=$(id -u)/; s/^LOCAL_GID=.*/LOCAL_GID=$(id -g)/" .env && rm .env.bak
+open .env   # or your preferred text editor, to set PROJECT_DIRECTORY next
 ````
 
 Set `PROJECT_DIRECTORY` to an **absolute path** on your machine — this directory gets
@@ -69,7 +73,13 @@ mounted inside the container at `/projects_mirror`, and is where input data, run
 scratch space, and output will live. Leave `IMAGE_TAG` as `latest` unless you need to
 pin to a specific FATES/API version (see `CHANGELOG.md` for what's available).
 
-`.env` is gitignored, so your local path never gets committed.
+`.env` is gitignored, so your local values never get committed.
+
+The container reads `LOCAL_UID`/`LOCAL_GID` at startup and remaps its internal user to
+match them, so files it creates in `PROJECT_DIRECTORY` are owned by you, not some
+container default — this only takes effect when the container **starts**, so if you
+edit `LOCAL_UID`/`LOCAL_GID` after already running `podman compose up`, you'll need
+`podman compose down` then `up -d` again for it to take effect.
 
 `podman compose` (step 4) reads `.env` automatically — nothing more to do for that.
 But the plain shell commands later in this README (step 5) reference
@@ -103,10 +113,9 @@ Make sure Podman Desktop (or Docker Desktop) is running, then from this repo's d
 podman compose up -d
 ````
 
-The container reads `LOCAL_UID`/`LOCAL_GID` at startup and remaps its internal user to
-match your host account, so files it creates in `PROJECT_DIRECTORY` are owned by you,
-not some arbitrary container UID — nothing to configure here, `compose.yaml` already
-passes your `id -u`/`id -g` by default.
+This reads `LOCAL_UID`/`LOCAL_GID` from `.env` (step 2) and remaps the container's
+internal user to match, so files it creates in `PROJECT_DIRECTORY` are owned by you,
+not some arbitrary container UID.
 
 Open a shell inside it — always pass `--user elm-user`, since `podman exec` bypasses
 the container's entrypoint (which is what remaps to your UID/GID and sets up
