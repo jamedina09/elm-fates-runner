@@ -11,6 +11,17 @@ I personally use [Podman](https://podman-desktop.io/downloads) to manage contain
 command below works with `docker` substituted for `podman`. I suggest Podman since it's
 rootless by default and considered more secure, but either is fine.
 
+## What's actually in the image, and what running it does
+
+The image already contains a compiled GCC/OpenMPI/HDF5/netCDF toolchain and the
+E3SM+FATES *source code* — but not a compiled *model*. Step 5 below
+(`e3sm_fates_test.sh`) runs `case.build`, which compiles the E3SM/FATES model itself
+from that source, inside the container, the first time you run it. That means step 5
+is not just "running a script" — it's a real compile step (several minutes) followed
+by an automatic input-data download (can be a GB+ depending on what's already
+cached) and then the actual 1-year simulation. Budget time accordingly; don't assume
+something's stuck just because it's slow.
+
 ## Prerequisites
 
 - Podman Desktop or Docker Desktop installed and running.
@@ -117,6 +128,19 @@ This reads `LOCAL_UID`/`LOCAL_GID` from `.env` (step 2) and remaps the container
 internal user to match, so files it creates in `PROJECT_DIRECTORY` are owned by you,
 not some arbitrary container UID.
 
+Confirm it's actually running before continuing — `podman compose up -d` can exit 0
+even if the container immediately crashed on startup:
+
+```bash
+podman ps -a --filter name=personal-elm-fates
+````
+
+Status should say `Up ...`, not `Exited (...)`. If it exited, check why:
+
+```bash
+podman logs personal-elm-fates
+````
+
 Open a shell inside it — always pass `--user elm-user`, since `podman exec` bypasses
 the container's entrypoint (which is what remaps to your UID/GID and sets up
 `elm-user`'s environment) and defaults to root otherwise. Running as root breaks
@@ -132,9 +156,11 @@ your `PROJECT_DIRECTORY` on the host.
 
 ## 5. Run the sample script
 
-`sample_script/e3sm_fates_test.sh` sets up and runs a single-point FATES test case in
-Brazil. Copy it into your project directory so it's visible inside the container, and
-run it from there:
+`sample_script/e3sm_fates_test.sh` sets up and runs a single-point FATES test case
+(`E3SM_FATES_TEST`, compset `2000_DATM%QIA_ELM%BGC-FATES_SICE_SOCN_SROF_SGLC_SWAV`,
+resolution `1x1_brazil`) — see "What's actually in the image" above for what this
+step really involves (a real model compile, not just a script run). Copy it into
+your project directory so it's visible inside the container, and run it from there:
 
 ```bash
 mkdir -p "$PROJECT_DIRECTORY/scripts"
@@ -145,10 +171,10 @@ chmod +x e3sm_fates_test.sh
 ./e3sm_fates_test.sh
 ````
 
-This builds the case, downloads the default input data automatically (`inputdata/`),
-runs the model for one simulated year, and archives output (`archive/`) — all under
-your `PROJECT_DIRECTORY`. To run your own site instead of the default, edit the script
-and point it at your own forcing data.
+This creates the case, compiles the model, downloads the default input data
+automatically (`inputdata/`), runs one simulated year, and archives output
+(`archive/`) — all under your `PROJECT_DIRECTORY`. To run your own site instead of
+the default, edit the script and point it at your own forcing data.
 
 ## 6. Check the output
 
@@ -175,6 +201,40 @@ podman compose down
 Anything created *inside* the container outside of `/projects_mirror` is lost when it
 stops — but everything under `/projects_mirror` (i.e. your `PROJECT_DIRECTORY` on the
 host) persists, since it's a bind mount, not container storage.
+
+## Troubleshooting
+
+Known issues hit while building this workflow, listed by their exact symptom so
+you can search/scan for yours:
+
+**`mkdir: /scripts: Read-only file system`** (or any command silently operating on
+`/whatever` instead of your actual project path) — `$PROJECT_DIRECTORY` is empty in
+your shell. `.env` is only auto-read by `podman compose`, not by your shell directly.
+Fix: `set -a; source .env; set +a` (see step 2).
+
+**`ERROR: No machine docker found`**, followed by `cd: /projects_mirror/scratch/...:
+No such file or directory` — you `exec`'d into the container without `--user
+elm-user`, so you're root, and the custom CIME machine config only lives under
+`elm-user`'s home. Fix: always use
+`podman exec -it --user elm-user personal-elm-fates /bin/bash` (see step 4).
+
+**`chmod: changing permissions of '...': Operation not permitted`** — usually means
+`LOCAL_UID`/`LOCAL_GID` weren't actually picked up when the container started (e.g.
+they were missing from `.env`, or you edited `.env` after the container was already
+running). Check with `podman exec personal-elm-fates id elm-user` — if the UID/GID
+shown doesn't match your host's `id -u`/`id -g`, fix `.env` (step 2) and restart the
+container: `podman compose down && podman compose up -d`.
+
+**`Error: can only create exec sessions on running containers: container state
+improper`** — the container isn't running (check with `podman ps -a`, then `podman
+logs personal-elm-fates` for why it exited). If the log shows `groupmod: GID '...'
+already exists`, that's a bug in older image builds — `podman pull` the latest image
+to get the fix, then `podman compose down && podman compose up -d`.
+
+**`Error: writing blob: ... denied: permission_denied: The token provided does not
+match expected scopes`** (only relevant if you're building/pushing the image
+yourself, not just running it) — your GHCR token is missing `write:packages`; see
+the build repo's docs.
 
 ## Versioning
 
